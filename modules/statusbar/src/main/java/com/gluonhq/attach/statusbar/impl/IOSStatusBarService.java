@@ -41,5 +41,10 @@ public class IOSStatusBarService implements StatusBarService {
         setNativeColor(color.getRed(), color.getGreen(), color.getBlue(), color.getOpacity());
     }
 
+    @Override
+    public void setSystemBarsAppearance(APPEARANCE statusBarAppearance, APPEARANCE navigationBarAppearance) {
+        // no-op
+    }
+
     private native void setNativeColor(double red, double green, double blue, double opacity);
 }

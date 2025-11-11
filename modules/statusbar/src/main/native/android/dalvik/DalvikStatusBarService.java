@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Gluon
+ * Copyright (c) 2020, 2025, Gluon
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,10 +29,14 @@ package com.gluonhq.helloandroid;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.util.Log;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+
+import androidx.core.view.WindowCompat;
 
 public class DalvikStatusBarService {
 
@@ -45,7 +49,7 @@ public class DalvikStatusBarService {
     }
 
     private void setColor(final int color) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) { // < 21
             Log.e(TAG, "StatusBar service is not supported for the current Android version");
             return;
         }
@@ -62,9 +66,43 @@ public class DalvikStatusBarService {
             @Override
             public void run() {
                 Window window = activity.getWindow();
-                window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-                window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-                window.setStatusBarColor(color);
+                if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) { // <= 34
+                    window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+                    // make status bar transparent
+                    window.setStatusBarColor(0x00000000);
+                    // paint window
+                    window.setBackgroundDrawable(new ColorDrawable(color));
+                } else { // >= 35
+                    View decorView = window.getDecorView();
+
+                    // Apply color
+                    decorView.setBackground(new ColorDrawable(color));
+                }
+            }
+        });
+    }
+
+    private void setSystemBarsAppearance(final boolean darkStatusBar, final boolean darkNavigationBar) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) { // < 21
+            Log.e(TAG, "StatusBar service is not supported for the current Android version");
+            return;
+        }
+        if (activity == null) {
+            Log.e(TAG, "FXActivity not found. This service is not allowed when "
+                    + "running in background mode or from wearable");
+            return;
+        }
+
+        if (Util.isDebug()) {
+            Log.v(TAG, "Set StatusBar appearance: " + (darkStatusBar ? "dark" : "light") + ", NavigationBar appearance: " + (darkNavigationBar ? "dark" : "light"));
+        }
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Window window = activity.getWindow();
+                View decorView = window.getDecorView();
+                WindowCompat.getInsetsController(window, decorView).setAppearanceLightStatusBars(darkStatusBar);
+                WindowCompat.getInsetsController(window, decorView).setAppearanceLightNavigationBars(darkNavigationBar);
             }
         });
     }
