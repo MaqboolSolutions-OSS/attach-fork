@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2022, Gluon
+ * Copyright (c) 2020, 2026, Gluon
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,25 +27,9 @@
  */
 package com.gluonhq.attach.keyboard.impl;
 
-import com.gluonhq.attach.keyboard.KeyboardService;
-import com.gluonhq.attach.util.Util;
-import javafx.animation.Interpolator;
-import javafx.animation.TranslateTransition;
 import javafx.application.Platform;
-import javafx.beans.property.ReadOnlyFloatProperty;
-import javafx.beans.property.ReadOnlyFloatWrapper;
-import javafx.scene.Node;
-import javafx.scene.Parent;
-import javafx.util.Duration;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-public class AndroidKeyboardService implements KeyboardService {
-
-    private static final Logger LOG = Logger.getLogger(AndroidKeyboardService.class.getName());
-    private static final ReadOnlyFloatWrapper VISIBLE_HEIGHT = new ReadOnlyFloatWrapper();
-    private static final boolean debug = Util.DEBUG;
+public class AndroidKeyboardService extends BaseKeyboardService {
 
     static {
         System.loadLibrary("keyboard");
@@ -54,47 +38,22 @@ public class AndroidKeyboardService implements KeyboardService {
     public AndroidKeyboardService() {
     }
 
-    @Override
-    public void keepVisibilityForNode(Node node) {
-        keepVisibilityForNode(node, null);
-    }
 
     @Override
-    public void keepVisibilityForNode(Node node, Parent parent) {
-        VISIBLE_HEIGHT.addListener((obs, ov, nv) -> adjustPosition(node, parent, nv.doubleValue()));
+    protected void applyKeyboardType(int nativeValue) {
+        nativeSetKeyboardType(nativeValue);
     }
 
     @Override
-    public ReadOnlyFloatProperty visibleHeightProperty() {
-        return VISIBLE_HEIGHT.getReadOnlyProperty();
+    protected void applyActiveNodeId(String id) {
+        nativeSetActiveNodeId(id);
     }
 
-    private static void adjustPosition(Node node, Parent parent, double kh) {
-        if (node == null || node.getScene() == null || node.getScene().getWindow() == null) {
-            return;
-        }
-        double tTot = node.getScene().getHeight();
-        double ty = node.getLocalToSceneTransform().getTy() + node.getBoundsInParent().getHeight() + 2;
-        double y = 1;
-        Parent root = parent == null ? node.getScene().getRoot() : parent;
-        if (ty > tTot - kh) {
-            y = tTot - ty - kh;
-        } else if (kh == 0 && root.getTranslateY() != 0) {
-            y = 0;
-        }
-        if (y <= 0) {
-            if (debug) {
-                LOG.log(Level.INFO, String.format("Moving %s %.2f pixels", root, y));
-            }
-            final TranslateTransition transition = new TranslateTransition(Duration.millis(50), root);
-            transition.setFromY(root.getTranslateY());
-            transition.setToY(y);
-            transition.setInterpolator(Interpolator.EASE_OUT);
-            transition.playFromStart();
-        }
-    }
+    // native
+    private static native void nativeSetKeyboardType(int keyboardTypeValue);
+    private static native void nativeSetActiveNodeId(String id);
 
-    // callback
+    // callbacks
     private static void notifyVisibleHeight(float height) {
         if (VISIBLE_HEIGHT.get() != height) {
             Platform.runLater(() -> VISIBLE_HEIGHT.set(height));

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2022, Gluon
+ * Copyright (c) 2020, 2026, Gluon
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,7 +29,10 @@
 
 static jclass jKeyboardServiceClass;
 static jclass jAttachKeyboardClass;
+static jclass jActivityClass;
 static jmethodID jAttach_notifyHeightMethod;
+static jmethodID jActivity_setKeyboardTypeMethod;
+static jmethodID jActivity_setActiveNodeIdMethod;
 
 void initKeyboard();
 static jfloat density;
@@ -68,13 +71,15 @@ void initKeyboard()
     KeyboardInited = 1;
 
     ATTACH_LOG_FINE("Init AndroidKeyboardService");
-    jclass activityClass = substrateGetActivityClass();
+    jActivityClass = substrateGetActivityClass();
     jobject jActivity = substrateGetActivity();
     jKeyboardServiceClass = GET_REGISTER_DALVIK_CLASS(jKeyboardServiceClass, "com/gluonhq/helloandroid/KeyboardService");
 
     ATTACH_DALVIK();
     jmethodID jKeyboardServiceInitMethod = (*dalvikEnv)->GetMethodID(dalvikEnv, jKeyboardServiceClass, "<init>", "(Landroid/app/Activity;)V");
     jobject keyboardservice = (*dalvikEnv)->NewObject(dalvikEnv, jKeyboardServiceClass, jKeyboardServiceInitMethod, jActivity);
+    jActivity_setKeyboardTypeMethod = (*dalvikEnv)->GetStaticMethodID(dalvikEnv, jActivityClass, "setKeyboardType", "(I)V");
+    jActivity_setActiveNodeIdMethod = (*dalvikEnv)->GetStaticMethodID(dalvikEnv, jActivityClass, "setActiveNodeId", "(Ljava/lang/String;)V");
     density = android_getDensity(dalvikEnv);
     DETACH_DALVIK();
 
@@ -83,6 +88,34 @@ void initKeyboard()
     }
     ATTACH_LOG_FINE("Dalvik KeyboardService init was called");
 }
+
+// from Java to Android
+
+JNIEXPORT void JNICALL Java_com_gluonhq_attach_keyboard_impl_AndroidKeyboardService_nativeSetKeyboardType(JNIEnv *env, jclass cls, jint keyboardTypeValue)
+{
+    ATTACH_LOG_FINE("nativeSetKeyboardType: keyboardTypeValue = %d", keyboardTypeValue);
+    ATTACH_DALVIK();
+    (*dalvikEnv)->CallStaticVoidMethod(dalvikEnv, jActivityClass, jActivity_setKeyboardTypeMethod, keyboardTypeValue);
+    DETACH_DALVIK();
+    ATTACH_LOG_FINE("nativeSetKeyboardType done");
+}
+
+JNIEXPORT void JNICALL Java_com_gluonhq_attach_keyboard_impl_AndroidKeyboardService_nativeSetActiveNodeId(JNIEnv *env, jclass cls, jstring id)
+{
+    const char *idChars = (*env)->GetStringUTFChars(env, id, NULL);
+    ATTACH_LOG_FINE("nativeSetActiveNodeId: id = %s", idChars);
+    ATTACH_DALVIK();
+    jstring dalvikId = (*dalvikEnv)->NewStringUTF(dalvikEnv, idChars);
+    (*dalvikEnv)->CallStaticVoidMethod(dalvikEnv, jActivityClass, jActivity_setActiveNodeIdMethod, dalvikId);
+    (*dalvikEnv)->DeleteLocalRef(dalvikEnv, dalvikId);
+    DETACH_DALVIK();
+    (*env)->ReleaseStringUTFChars(env, id, idChars);
+    ATTACH_LOG_FINE("nativeSetActiveNodeId done");
+}
+
+///////////////////////////
+// From Dalvik to native //
+///////////////////////////
 
 JNIEXPORT void JNICALL Java_com_gluonhq_helloandroid_KeyboardService_nativeDispatchKeyboardHeight(JNIEnv *env, jobject activity, jfloat jheight)
 {

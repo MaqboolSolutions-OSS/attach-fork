@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, Gluon
+ * Copyright (c) 2020, 2026, Gluon
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -79,10 +79,44 @@ public interface KeyboardService {
     void keepVisibilityForNode(Node node, Parent parent);
 
     /**
+     * Stops adjusting the node when the software keyboard shows up,
+     * removing the listener previously registered via
+     * {@link #keepVisibilityForNode(Node)} or {@link #keepVisibilityForNode(Node, Parent)}.
+     *
+     * @param node the Node that was previously registered
+     * @since 4.0.25
+     */
+    void releaseVisibilityForNode(Node node);
+
+    /**
      * Gets the visible height of the Keyboard, so scene or views can adjusted
      * to prevent some of their content from being covered by the keyboard.
      *
      * @return A ReadOnlyFloatProperty with the height of the soft keyboard
      */
     ReadOnlyFloatProperty visibleHeightProperty();
+
+    /**
+     * Assigns a keyboard type to a specific node (typically a {@link javafx.scene.control.TextInputControl}).
+     * When the node gains gets activated, the keyboard type is applied automatically.
+     * When the keyboard hides, the keyboard type reverts to {@link KeyboardType#ASCII}.
+     *
+     * <p>If nodes are registered, they default to {@link KeyboardType#ASCII}.</p>
+     *
+     * @param node the node (typically a text input control) to configure
+     * @param type the {@link KeyboardType} to use when this node is active
+     * @since 4.0.25
+     */
+    void setKeyboardTypeForNode(Node node, KeyboardType type);
+
+    /**
+     * Removes the keyboard type assignment and event filter previously installed via
+     * {@link #setKeyboardTypeForNode(Node, KeyboardType)}. After this call the node
+     * will simply use the default keyboard type.
+     *
+     * @param node the node to unregister
+     * @since 4.0.25
+     */
+    void removeKeyboardTypeForNode(Node node);
+
 }

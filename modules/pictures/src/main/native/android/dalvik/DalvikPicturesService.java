@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020, 2024, Gluon
+ * Copyright (c) 2020, 2026, Gluon
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -36,11 +36,11 @@ import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
-import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.util.Log;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -51,24 +51,45 @@ import java.util.Date;
 
 import static android.app.Activity.RESULT_OK;
 
+/**
+ * Entry point for the pictures service Android implementation.
+ * It verifies permissions, stages capture files, preprocesses images,
+ * and bridges camera results back to the native Attach layer.
+ */
 public class DalvikPicturesService  {
 
     private static final String TAG = Util.TAG;
     private static final int SELECT_PICTURE = 1;
-    private static final int TAKE_PICTURE = 2;
 
     private final Activity activity;
     private final boolean debug;
     private boolean verified;
 
-    private final String authority;
     private String photoPath;
+
+    private CameraController cameraController;
 
     public DalvikPicturesService(Activity activity) {
         this.activity = activity;
         this.debug = Util.isDebug();
-        authority = activity.getPackageName() + ".fileprovider";
         clearCache();
+    }
+
+    private CameraController getOrCreateCameraController() {
+        if (cameraController == null) {
+            cameraController = new CameraController(activity, TAG, debug, new CameraController.Listener() {
+                @Override
+                public void onCaptured(File targetFile, boolean savePhoto) {
+                    handleCapturedPhoto(targetFile, savePhoto);
+                }
+
+                @Override
+                public void onCancelled() {
+                    sendCancelled();
+                }
+            });
+        }
+        return cameraController;
     }
 
     private boolean verifyPermissions() {
@@ -92,76 +113,63 @@ public class DalvikPicturesService  {
             Log.v(TAG, "Permission verification failed: Camera disabled");
             return;
         }
-
-        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-
-        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        // Create the file where the photo should go
-        try {
-            File photo = savePhoto ? new File(Environment.getExternalStoragePublicDirectory(
-                    Environment.DIRECTORY_PICTURES), "IMG_"+ timeStamp + ".jpg") :
-                    File.createTempFile("IMG_"+ timeStamp, ".jpg", activity.getCacheDir());
-            if (photo.exists()) {
-                photo.delete();
-            } else {
-                photo.getParentFile().mkdirs();
-            }
-            photoPath = "file:" + photo.getAbsolutePath();
-            if (debug) {
-                Log.v(TAG, "Picture file: " + photoPath);
-            }
-
-            Uri photoUri = FileProvider.getUriForFile(activity, authority, photo);
-            intent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri);
-            intent.setFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-        } catch (IOException e) {
-            Log.e(TAG, "Error creating file " + e.getMessage());
-        }
-
-        IntentHandler intentHandler = new IntentHandler() {
-            @Override
-            public void gotActivityResult (int requestCode, int resultCode, Intent intent) {
-                if (requestCode == TAKE_PICTURE && resultCode == RESULT_OK) {
-                    if (debug) {
-                        Log.v(TAG, "Picture successfully taken at " + photoPath);
-                    }
-                    Uri imageUri = Uri.parse(photoPath);
-                    File photoFile = new File(imageUri.getPath());
-                    if (photoFile.exists()) {
-                        int imageRotation = getImageRotation(imageUri);
-                        if (debug) {
-                            Log.v(TAG, "Image file located at " + photoFile.getAbsolutePath() + " with rotation: " + imageRotation);
-                        }
-                        sendPhotoFile(photoFile.getAbsolutePath(), imageRotation);
-
-                        if (savePhoto) {
-                            // media scanner to rescan DIRECTORY_PICTURES after an image is saved/deleted
-                            MediaScannerConnection.scanFile(activity, new String[]{photoFile.toString()}, null, null);
-                        }
-                    } else {
-                        Log.e(TAG, "Picture file doesn't exist for: " + photoFile.getAbsolutePath());
-                    }
-                }
-            }
-        };
-
-        if (activity == null) {
-            Log.e(TAG, "Activity not found. This service is not allowed when "
-                    + "running in background mode or from wearable");
+        clearCache();
+        File photoFile = createCaptureFile(savePhoto);
+        if (photoFile == null) {
+            sendCancelled();
             return;
         }
-
-        Util.setOnActivityResultHandler(intentHandler);
-
-        // check for permissions
-        if (intent.resolveActivity(activity.getPackageManager()) != null) {
-            activity.startActivityForResult(intent, TAKE_PICTURE);
-        } else {
-            Log.e(TAG, "GalleryActivity: resolveActivity failed");
+        photoPath = "file:" + photoFile.getAbsolutePath();
+        if (debug) {
+            Log.v(TAG, "Camera capture requested. Picture file: " + photoPath);
+        }
+        if (!getOrCreateCameraController().start(savePhoto, photoFile)) {
+            Log.e(TAG, "Camera startup failed");
+            sendCancelled();
         }
     }
 
+    private File createCaptureFile(boolean savePhoto) {
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+        try {
+            File photo = savePhoto
+                    ? new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "IMG_" + timeStamp + ".jpg")
+                    : File.createTempFile("IMG_" + timeStamp, ".jpg", activity.getCacheDir());
+            if (photo.exists()) {
+                photo.delete();
+            } else if (photo.getParentFile() != null) {
+                photo.getParentFile().mkdirs();
+            }
+            return photo;
+        } catch (IOException e) {
+            Log.e(TAG, "Error creating file " + e.getMessage());
+            return null;
+        }
+    }
+
+    private void handleCapturedPhoto(File photoFile, boolean savePhoto) {
+        if (photoFile == null || !photoFile.exists()) {
+            Log.e(TAG, "Picture file doesn't exist for: " + (photoFile == null ? "null" : photoFile.getAbsolutePath()));
+            return;
+        }
+        Uri imageUri = Uri.fromFile(photoFile);
+        int imageRotation = getImageRotation(imageUri);
+        if (debug) {
+            Log.v(TAG, "Image file located at " + photoFile.getAbsolutePath() + " with rotation: " + imageRotation);
+        }
+
+        String originalPath = photoFile.getAbsolutePath();
+        if (savePhoto) {
+            MediaScannerConnection.scanFile(activity, new String[]{photoFile.toString()}, null, null);
+            photoFile = copyToCache(photoFile);
+        }
+        ImagePreprocessor.preprocessImage(photoFile, imageRotation, debug, TAG);
+        sendPhotoFile(originalPath, photoFile.getAbsolutePath());
+    }
+
     private void selectPicture() {
+        clearCache();
+
         Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
         intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         intent.setType("image/*");
@@ -193,9 +201,13 @@ public class DalvikPicturesService  {
                             if (debug) {
                                 Log.v(TAG, "Image file located at " + cachePhotoFile.getAbsolutePath() + " with rotation: " + imageRotation);
                             }
-                            sendPhotoFile(cachePhotoFile.getAbsolutePath(), imageRotation);
+                            String originalPath = cachePhotoFile.getAbsolutePath();
+                            ImagePreprocessor.preprocessImage(cachePhotoFile, imageRotation, debug, TAG);
+                            sendPhotoFile(originalPath, cachePhotoFile.getAbsolutePath());
                         }
                     }
+                } else if (requestCode == SELECT_PICTURE) {
+                    sendCancelled();
                 }
             }
         };
@@ -212,6 +224,9 @@ public class DalvikPicturesService  {
 
     private void clearCache() {
         File[] files = activity.getCacheDir().listFiles();
+        if (files == null) {
+            return;
+        }
         for (File file : files) {
             if (file.exists() && file.getName().endsWith(".jpg")) {
                 file.delete();
@@ -232,7 +247,9 @@ public class DalvikPicturesService  {
         try {
             ExifInterface ei;
             if (Build.VERSION.SDK_INT > 23) {
-                ei = new ExifInterface(activity.getContentResolver().openInputStream(uri));
+                try (InputStream is = activity.getContentResolver().openInputStream(uri)) {
+                    ei = new ExifInterface(is);
+                }
             } else {
                 ei = new ExifInterface(uri.getPath());
             }
@@ -258,7 +275,7 @@ public class DalvikPicturesService  {
         File selectedFile = new File(activity.getCacheDir(), getImageName(uri));
         try (InputStream is = activity.getContentResolver().openInputStream(uri);
              OutputStream os = new FileOutputStream(selectedFile)) {
-            byte[] buffer = new byte[8 * 1024];
+            byte[] buffer = new byte[32 * 1024];
             int bytesRead;
             while ((bytesRead = is.read(buffer)) != -1) {
                 os.write(buffer, 0, bytesRead);
@@ -271,7 +288,23 @@ public class DalvikPicturesService  {
         return selectedFile;
     }
 
+    private File copyToCache(File source) {
+        File dest = new File(activity.getCacheDir(), "display_" + source.getName());
+        try (InputStream is = new FileInputStream(source); OutputStream os = new FileOutputStream(dest)) {
+            byte[] buffer = new byte[32 * 1024];
+            int bytesRead;
+            while ((bytesRead = is.read(buffer)) != -1) {
+                os.write(buffer, 0, bytesRead);
+            }
+        } catch (IOException ex) {
+            Log.e(TAG, "copyToCache failed: " + ex.getMessage());
+            return source; // fall back to original
+        }
+        return dest;
+    }
+
     // native
-    private native void sendPhotoFile(String filePath, int rotate);
+    private native void sendPhotoFile(String originalFilePath, String processedFilePath);
+    private native void sendCancelled();
 
 }

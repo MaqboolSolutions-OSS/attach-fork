@@ -33,7 +33,7 @@ subprojects {
 
     javafx {
         version = "17.0.17"
-        modules 'javafx.graphics'
+        modules 'javafx.graphics', 'javafx.controls'
     }
 }
 
