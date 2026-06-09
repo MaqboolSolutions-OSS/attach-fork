@@ -31,6 +31,13 @@ static jclass jStatusBarServiceClass;
 static jobject jDalvikStatusBarService;
 static jmethodID jStatusBarServiceColorMethod;
 static jmethodID jStatusBarServiceDarkAppearanceMethod;
+static jmethodID jStatusBarGetNativeStatusBarHeightMethod;
+static jmethodID jStatusBarGetNativeNavigationBarHeightMethod;
+static jmethodID jStatusBarGetNativeSafeInsetLeftPxMethod;
+static jmethodID jStatusBarGetNativeSafeInsetTopPxMethod;
+static jmethodID jStatusBarGetNativeSafeInsetRightPxMethod;
+static jmethodID jStatusBarGetNativeSafeInsetBottomPxMethod;
+static jmethodID jStatusBarGetNativePxToDpMethod;
 
 static void initializeStatusBarDalvikHandles() {
     jStatusBarServiceClass = GET_REGISTER_DALVIK_CLASS(jStatusBarServiceClass, "com/gluonhq/helloandroid/DalvikStatusBarService");
@@ -38,6 +45,13 @@ static void initializeStatusBarDalvikHandles() {
     jmethodID jStatusBarServiceInitMethod = (*dalvikEnv)->GetMethodID(dalvikEnv, jStatusBarServiceClass, "<init>", "(Landroid/app/Activity;)V");
     jStatusBarServiceColorMethod = (*dalvikEnv)->GetMethodID(dalvikEnv, jStatusBarServiceClass, "setColor", "(I)V");
     jStatusBarServiceDarkAppearanceMethod = (*dalvikEnv)->GetMethodID(dalvikEnv, jStatusBarServiceClass, "setSystemBarsAppearance", "(ZZ)V");
+    jStatusBarGetNativeStatusBarHeightMethod = (*dalvikEnv)->GetMethodID(dalvikEnv, jStatusBarServiceClass, "getNativeStatusBarHeight", "()F");
+    jStatusBarGetNativeNavigationBarHeightMethod = (*dalvikEnv)->GetMethodID(dalvikEnv, jStatusBarServiceClass, "getNativeNavigationBarHeight", "()F");
+    jStatusBarGetNativeSafeInsetLeftPxMethod = (*dalvikEnv)->GetMethodID(dalvikEnv, jStatusBarServiceClass, "getNativeSafeInsetLeftPx", "()I");
+    jStatusBarGetNativeSafeInsetTopPxMethod = (*dalvikEnv)->GetMethodID(dalvikEnv, jStatusBarServiceClass, "getNativeSafeInsetTopPx", "()I");
+    jStatusBarGetNativeSafeInsetRightPxMethod = (*dalvikEnv)->GetMethodID(dalvikEnv, jStatusBarServiceClass, "getNativeSafeInsetRightPx", "()I");
+    jStatusBarGetNativeSafeInsetBottomPxMethod = (*dalvikEnv)->GetMethodID(dalvikEnv, jStatusBarServiceClass, "getNativeSafeInsetBottomPx", "()I");
+    jStatusBarGetNativePxToDpMethod = (*dalvikEnv)->GetMethodID(dalvikEnv, jStatusBarServiceClass, "getNativePxToDp", "(I)F");
 
     jobject jActivity = substrateGetActivity();
     jobject jtmpobj = (*dalvikEnv)->NewObject(dalvikEnv, jStatusBarServiceClass, jStatusBarServiceInitMethod, jActivity);
@@ -91,4 +105,70 @@ JNIEXPORT void JNICALL Java_com_gluonhq_attach_statusbar_impl_AndroidStatusBarSe
     }
     (*dalvikEnv)->CallVoidMethod(dalvikEnv, jDalvikStatusBarService, jStatusBarServiceDarkAppearanceMethod, darkStatusBar, darkNavigationBar);
     DETACH_DALVIK();
+}
+
+JNIEXPORT jfloat JNICALL Java_com_gluonhq_attach_statusbar_impl_AndroidStatusBarService_getNativeStatusBarHeight
+(JNIEnv *env, jclass jClass)
+{
+    ATTACH_DALVIK();
+    jfloat answer = (*dalvikEnv)->CallFloatMethod(dalvikEnv, jDalvikStatusBarService, jStatusBarGetNativeStatusBarHeightMethod);
+    DETACH_DALVIK();
+    return answer;
+}
+
+JNIEXPORT jfloat JNICALL Java_com_gluonhq_attach_statusbar_impl_AndroidStatusBarService_getNativeNavigationBarHeight
+(JNIEnv *env, jclass jClass)
+{
+    ATTACH_DALVIK();
+    jfloat answer = (*dalvikEnv)->CallFloatMethod(dalvikEnv, jDalvikStatusBarService, jStatusBarGetNativeNavigationBarHeightMethod);
+    DETACH_DALVIK();
+    return answer;
+}
+
+JNIEXPORT jint JNICALL Java_com_gluonhq_attach_statusbar_impl_AndroidStatusBarService_getNativeSafeInsetLeftPx
+(JNIEnv *env, jclass jClass)
+{
+    ATTACH_DALVIK();
+    jint answer = (*dalvikEnv)->CallIntMethod(dalvikEnv, jDalvikStatusBarService, jStatusBarGetNativeSafeInsetLeftPxMethod);
+    DETACH_DALVIK();
+    return answer;
+}
+
+JNIEXPORT jint JNICALL Java_com_gluonhq_attach_statusbar_impl_AndroidStatusBarService_getNativeSafeInsetTopPx
+(JNIEnv *env, jclass jClass)
+{
+    ATTACH_DALVIK();
+    jint answer = (*dalvikEnv)->CallIntMethod(dalvikEnv, jDalvikStatusBarService, jStatusBarGetNativeSafeInsetTopPxMethod);
+    DETACH_DALVIK();
+    return answer;
+}
+
+JNIEXPORT jint JNICALL Java_com_gluonhq_attach_statusbar_impl_AndroidStatusBarService_getNativeSafeInsetRightPx
+(JNIEnv *env, jclass jClass)
+{
+    ATTACH_DALVIK();
+    jint answer = (*dalvikEnv)->CallIntMethod(dalvikEnv, jDalvikStatusBarService, jStatusBarGetNativeSafeInsetRightPxMethod);
+    DETACH_DALVIK();
+    return answer;
+}
+
+JNIEXPORT jint JNICALL Java_com_gluonhq_attach_statusbar_impl_AndroidStatusBarService_getNativeSafeInsetBottomPx
+(JNIEnv *env, jclass jClass)
+{
+    ATTACH_DALVIK();
+    jint answer = (*dalvikEnv)->CallIntMethod(dalvikEnv, jDalvikStatusBarService, jStatusBarGetNativeSafeInsetBottomPxMethod);
+    DETACH_DALVIK();
+    return answer;
+}
+
+JNIEXPORT jfloat JNICALL Java_com_gluonhq_attach_statusbar_impl_AndroidStatusBarService_getNativePxToDp
+(JNIEnv *env, jclass jClass, jint px)
+{
+    ATTACH_DALVIK();
+     if (isDebugAttach()) {
+        ATTACH_LOG_FINE("Get native dp of, value: %d", px);
+     }
+    jfloat answer = (*dalvikEnv)->CallFloatMethod(dalvikEnv, jDalvikStatusBarService, jStatusBarGetNativePxToDpMethod, px);
+    DETACH_DALVIK();
+    return answer;
 }

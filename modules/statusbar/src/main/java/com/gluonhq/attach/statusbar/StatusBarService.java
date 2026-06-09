@@ -56,6 +56,7 @@ public interface StatusBarService {
 
     /**
      * Returns an instance of {@link StatusBarService}.
+     *
      * @return An instance of {@link StatusBarService}.
      */
     static Optional<StatusBarService> create() {
@@ -64,6 +65,7 @@ public interface StatusBarService {
 
     /**
      * Sets the color of the status bar to the specified color.
+     *
      * @param color The color to set the status bar to.
      */
     void setColor(Color color);
@@ -73,8 +75,24 @@ public interface StatusBarService {
      * Sets the appearance of the icons of the system bars to light or dark,
      * so these have enough contrast and can be easily read
      * Only applies to Android.
-     * @param statusBarAppearance the light or dark appearance of the status bar
+     *
+     * @param statusBarAppearance     the light or dark appearance of the status bar
      * @param navigationBarAppearance the light or dark appearance of the navigation bar
      */
     void setSystemBarsAppearance(APPEARANCE statusBarAppearance, APPEARANCE navigationBarAppearance);
+
+    float getStatusBarHeight();
+
+    float getNavigationBarHeight();
+
+
+    int getSafeInsetLeftPx();
+
+    int getSafeInsetTopPx();
+
+    int getSafeInsetRightPx();
+
+    int getSafeInsetBottomPx();
+
+    float getPxToDp(int px);
 }

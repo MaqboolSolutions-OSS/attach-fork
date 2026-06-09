@@ -28,12 +28,14 @@
 package com.gluonhq.helloandroid;
 
 import android.app.Activity;
-import android.content.Context;
+import android.graphics.Rect;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Build;
 import android.util.Log;
+import android.view.DisplayCutout;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 
 import androidx.core.view.WindowCompat;
@@ -105,6 +107,101 @@ public class DalvikStatusBarService {
                 WindowCompat.getInsetsController(window, decorView).setAppearanceLightNavigationBars(darkNavigationBar);
             }
         });
+    }
+
+    public float getNativeStatusBarHeight() {
+        int result = 0;
+        int resourceId = activity.getResources()
+                .getIdentifier("status_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            result = activity.getResources().getDimensionPixelSize(resourceId);
+        }
+        return pxToDp(result);
+    }
+
+    public float getNativeNavigationBarHeight() {
+        int result = 0;
+        int resourceId = activity.getResources()
+                .getIdentifier("navigation_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            result = activity.getResources().getDimensionPixelSize(resourceId);
+        }
+        return pxToDp(result);
+    }
+
+    public float pxToDp(int px) {
+        return px / activity.getResources().getDisplayMetrics().density;
+    }
+
+    public int getNativeSafeInsetLeftPx() {
+        return getSafeArea(activity).left;
+    }
+
+    public int getNativeSafeInsetTopPx() {
+        return getSafeArea(activity).top;
+    }
+
+    public int getNativeSafeInsetRightPx() {
+        return getSafeArea(activity).right;
+    }
+
+    public int getNativeSafeInsetBottomPx() {
+        return getSafeArea(activity).bottom;
+    }
+
+    public float getNativePxToDp(int px) {
+        return pxToDp(px);
+    }
+
+    public static Rect getSafeArea(Activity activity) {
+
+        View decor = activity.getWindow().getDecorView();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            // API 30+
+            WindowInsets insets = decor.getRootWindowInsets();
+            if (insets == null) return new Rect();
+
+            android.graphics.Insets i =
+                    insets.getInsets(
+                            WindowInsets.Type.systemBars()
+                                    | WindowInsets.Type.displayCutout()
+                    );
+
+            return new Rect(i.left, i.top, i.right, i.bottom);
+
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            // API 28–29
+            WindowInsets insets = decor.getRootWindowInsets();
+            if (insets == null) return new Rect();
+
+            int left = 0;
+            int top = insets.getSystemWindowInsetTop();
+            int right = 0;
+            int bottom = insets.getSystemWindowInsetBottom();
+
+            DisplayCutout cutout = insets.getDisplayCutout();
+            if (cutout != null) {
+                left = cutout.getSafeInsetLeft();
+                top = Math.max(top, cutout.getSafeInsetTop());
+                right = cutout.getSafeInsetRight();
+                bottom = Math.max(bottom, cutout.getSafeInsetBottom());
+            }
+
+            return new Rect(left, top, right, bottom);
+
+        } else {
+            // API 24–27 (NO cutout support)
+            WindowInsets insets = decor.getRootWindowInsets();
+            if (insets == null) return new Rect();
+
+            return new Rect(
+                    insets.getSystemWindowInsetLeft(),
+                    insets.getSystemWindowInsetTop(),
+                    insets.getSystemWindowInsetRight(),
+                    insets.getSystemWindowInsetBottom()
+            );
+        }
     }
 
 }

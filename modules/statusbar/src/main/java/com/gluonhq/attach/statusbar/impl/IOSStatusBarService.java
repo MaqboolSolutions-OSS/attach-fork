@@ -46,5 +46,40 @@ public class IOSStatusBarService implements StatusBarService {
         // no-op
     }
 
+    @Override
+    public float getNavigationBarHeight() {
+        return 0;
+    }
+
+    @Override
+    public float getStatusBarHeight() {
+        return 0;
+    }
+
+    @Override
+    public int getSafeInsetLeftPx() {
+        return 0;
+    }
+
+    @Override
+    public int getSafeInsetTopPx() {
+        return 0;
+    }
+
+    @Override
+    public int getSafeInsetRightPx() {
+        return 0;
+    }
+
+    @Override
+    public int getSafeInsetBottomPx() {
+        return 0;
+    }
+
+    @Override
+    public float getPxToDp(int px) {
+        return 0;
+    }
+
     private native void setNativeColor(double red, double green, double blue, double opacity);
 }

@@ -46,6 +46,41 @@ public class AndroidStatusBarService implements StatusBarService {
         setNativeSystemBarsAppearance(statusBarAppearance == APPEARANCE.DARK, navigationBarAppearance == APPEARANCE.DARK);
     }
 
+    @Override
+    public float getStatusBarHeight() {
+        return getNativeStatusBarHeight();
+    }
+
+    @Override
+    public float getNavigationBarHeight() {
+        return getNativeNavigationBarHeight();
+    }
+
+    @Override
+    public int getSafeInsetLeftPx() {
+        return getNativeSafeInsetLeftPx();
+    }
+
+    @Override
+    public int getSafeInsetTopPx() {
+        return getNativeSafeInsetTopPx();
+    }
+
+    @Override
+    public int getSafeInsetRightPx() {
+        return getNativeSafeInsetRightPx();
+    }
+
+    @Override
+    public int getSafeInsetBottomPx() {
+        return getNativeSafeInsetBottomPx();
+    }
+
+    @Override
+    public float getPxToDp(int px) {
+        return getNativePxToDp(px);
+    }
+
     private static int getIntColor(Color color) {
         if (color == null) {
             return 0xff000000; // Black
@@ -59,5 +94,20 @@ public class AndroidStatusBarService implements StatusBarService {
     }
 
     private native void setNativeColor(int color);
+
     private native void setNativeSystemBarsAppearance(boolean darkStatusBar, boolean darkNavigationBar);
+
+    private native float getNativeStatusBarHeight();
+
+    private native float getNativeNavigationBarHeight();
+
+    private native int getNativeSafeInsetLeftPx();
+
+    private native int getNativeSafeInsetTopPx();
+
+    private native int getNativeSafeInsetRightPx();
+
+    private native int getNativeSafeInsetBottomPx();
+
+    private native float getNativePxToDp(int px);
 }
