@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2024, Gluon
+ * Copyright (c) 2016, 2026, Gluon
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -26,8 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #import <UIKit/UIKit.h>
+#import <sys/utsname.h>
 #include "jni.h"
 #include "AttachMacros.h"
+
+@interface Device : NSObject {}
+- (NSString *)GetDeviceModel;
+@end
 
 JNIEnv *env;
 
@@ -46,6 +51,7 @@ JNI_OnLoad_Device(JavaVM *vm, void *reserved)
 }
 
 static int deviceInited = 0;
+Device *_device;
 
 // Device
 jclass mat_jDeviceServiceClass;
@@ -59,13 +65,14 @@ JNIEXPORT void JNICALL Java_com_gluonhq_attach_device_impl_IOSDeviceService_init
         return;
     }
     deviceInited = 1;
-    
+    _device = [[Device alloc] init];
+
     mat_jDeviceServiceClass = (*env)->NewGlobalRef(env, (*env)->FindClass(env, "com/gluonhq/attach/device/impl/IOSDeviceService"));
     mat_jDeviceService_sendDevice = (*env)->GetStaticMethodID(env, mat_jDeviceServiceClass, "sendDeviceData", "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
 
     UIDevice* currentDevice = [UIDevice currentDevice];
 
-    NSString *deviceModel = (NSString*)[currentDevice model];
+    NSString *deviceModel = [NSString stringWithFormat:@"%@ (%@)", [_device GetDeviceModel], (NSString*)[currentDevice model]];
     const char *modelChars = [deviceModel UTF8String];
     jstring argModel = (*env)->NewStringUTF(env, modelChars);
 
@@ -82,7 +89,13 @@ JNIEXPORT void JNICALL Java_com_gluonhq_attach_device_impl_IOSDeviceService_init
     jstring argVersion = (*env)->NewStringUTF(env, versionChars);
 
     NSLocale *locale = [NSLocale currentLocale];
-    NSString *localeFormat = [NSString stringWithFormat:@"%@_%@", [locale objectForKey:NSLocaleLanguageCode], [locale objectForKey:NSLocaleCountryCode]];
+    NSString *country = [locale objectForKey:NSLocaleCountryCode];
+    // currentLocale's language is limited to the app's supported language or CFBundleLocalizations if set, nothing to
+    // do with the device's language, which should be picked from the first preferredLanguage, if set.
+    NSString *preferred = [[NSLocale preferredLanguages] firstObject];
+    NSLocale *langLocale = preferred != nil ? [NSLocale localeWithLocaleIdentifier:preferred] : locale;
+    NSString *language = [langLocale objectForKey:NSLocaleLanguageCode];
+    NSString *localeFormat = [NSString stringWithFormat:@"%@_%@", language, country];
     const char *localeChars = [localeFormat UTF8String];
     jstring argLocale = (*env)->NewStringUTF(env, localeChars);
 
@@ -93,3 +106,28 @@ JNIEXPORT void JNICALL Java_com_gluonhq_attach_device_impl_IOSDeviceService_init
     (*env)->DeleteLocalRef(env, argVersion);
     (*env)->DeleteLocalRef(env, argLocale);
 }
+
+@implementation Device
+
+- (NSString *)GetDeviceModel
+{
+    static dispatch_once_t token;
+    static NSString *modelString = nil;
+
+    dispatch_once(&token, ^{
+#if TARGET_OS_SIMULATOR
+        modelString = [NSProcessInfo.processInfo.environment[@"SIMULATOR_MODEL_IDENTIFIER"] retain];
+#endif
+        if (modelString == nil) {
+            struct utsname systemInfo;
+            uname(&systemInfo);
+            modelString = [[NSString stringWithCString:systemInfo.machine encoding:NSUTF8StringEncoding] retain];
+        }
+    });
+    if (debugAttach) {
+        AttachLog(@"Device model identifier: %@", modelString);
+    }
+    return modelString;
+}
+
+@end
