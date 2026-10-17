@@ -32,7 +32,7 @@ subprojects {
     }
 
     javafx {
-        version = "17.0.17"
+        version = "20.0.2"
         modules 'javafx.graphics', 'javafx.controls'
     }
 }

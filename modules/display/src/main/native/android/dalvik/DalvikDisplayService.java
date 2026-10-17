@@ -62,13 +62,21 @@ public class DalvikDisplayService {
 
         Window window = activity.getWindow();
         View decorView = window.getDecorView();
-        ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, insets) -> {
-            notifyInsets(insets, metrics.density);
-            return insets;
+        // This service is created on the Graal thread, after the first insets pass may already
+        // have been dispatched. Register on the UI thread, publish whatever the window already
+        // has, and ask for a fresh dispatch so the initial insets are never missed (otherwise
+        // they only arrive after a configuration change such as a rotation).
+        activity.runOnUiThread(() -> {
+            ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, insets) -> {
+                notifyInsets(insets, metrics.density);
+                return insets;
+            });
+            WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(decorView);
+            if (insets != null) {
+                notifyInsets(insets, metrics.density);
+            }
+            ViewCompat.requestApplyInsets(decorView);
         });
-        // Get initial insets
-        WindowInsetsCompat insets = ViewCompat.getRootWindowInsets(decorView);
-        notifyInsets(insets, metrics.density);
     }
 
     private boolean isPhoneFactor() {
@@ -91,7 +99,9 @@ public class DalvikDisplayService {
     }
 
     private void notifyInsets(WindowInsetsCompat insets, double density) {
-        Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+        // Include display cutouts so camera notches are reported as insets too (landscape sides).
+        Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars()
+                | WindowInsetsCompat.Type.displayCutout());
         if (Util.isDebug()) {
             Log.v(TAG, "Display got new insets: " + systemBars);
         }
